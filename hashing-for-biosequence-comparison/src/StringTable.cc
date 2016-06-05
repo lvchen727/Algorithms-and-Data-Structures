@@ -1,0 +1,247 @@
+// STRINGTABLE.CC
+// A hash table mapping strings to their positions in the the pattern sequence
+// You get to fill in the methods for this part.  Since we're passing around
+// raw character strings, I've made the match length a parameter of the
+// hash table so we don't have to keep figuring it out on each call.
+
+#include <iostream>
+#include <cmath>
+#include <cstring>
+#include "StringTable.h"
+
+using namespace std;
+
+/////////////////////////////
+// HINT: the built-in C++ function strncmp 
+// 	 (from the cstring library included above) may be used to 
+// 	 compare two C-style strings of type (const char*) for equality.
+// 	 format: strncmp(const char* s1, const char* s2, length) compares
+// 	 up to length characters of s1 and s2, returning an int equal to
+// 	 0 if they are identical and nonzero otherwise.
+/////////////////////////////
+
+//
+// Create an empty table big enough to hold maxSize records.
+//
+StringTable::StringTable(int maxSize, int imatchLength)
+  : matchLength{imatchLength}
+{
+	m = 2;
+	for (int j = 0; j < 2; j++){ //fills table with empty slots
+		table[j] = nullptr;
+	}
+}
+
+//
+//increments the size of table and doubles it if it exceeds minLoadFactor
+//
+void StringTable::fill(){
+	loadFactor = ((double)intRec/(double)m);
+	if(loadFactor > minLoadFactor){
+		repopulate();
+	}
+}
+
+//
+//create a new table double double the size of slots, and fills it with value from current table
+//then replace the old table with the new table
+//
+void StringTable::repopulate()
+{
+	//make a copy of the table
+	Record **tempTable = new Record*[m];
+	for(int i = 0; i < m; i++){
+		tempTable[i] = table[i];
+	}
+
+	//double m
+	powerOfListSize++;
+	m =(int)pow(2,powerOfListSize);
+
+	//reset intRec to 0; it will increase in the next for loop;
+	intRec = 0;
+
+	table = new Record*[m];
+
+	for (int j = 0; j < m; j++){ //fills table with empty slots
+		table[j] = nullptr;
+	}
+
+	//rehash the records from the previous table
+	for(int i = 0; i < m/2; i++){
+		if(tempTable[i] != nullptr)
+			insert(tempTable[i]);
+	}
+
+	delete[] tempTable;
+
+}
+
+//
+//input : table's slot number
+//output : the hashValue(the integer result of toHashKey function) of the record stored in that particular slot
+//
+int StringTable::toHashValue(int s){
+	table[s]->hashValue = toHashKey(table[s]->key);
+	return table[s]->hashValue;
+}
+
+//
+// Insert a Record r into the table.  Return true if
+// successful, false if the table is full.  You shouldn't ever
+// get two insertions with the same key value, but you may
+// simply return false if this happens.
+//
+bool StringTable::insert(Record *r)
+{
+	fill(); //Adjust the load factor, and double the size of table if necessary
+	int hash = toHashKey(r->key);//find r's hash value
+	int h1 = baseHash(hash) ;
+	int h2 = stepHash(hash) ;
+
+	int s = h1;//Initial slot to try
+	int i = 0;
+
+	while(table[s] != nullptr && i < m){
+		if(toHashValue(s) == hash){
+			if(strncmp(table[s]->key, r->key,matchLength) == 0){
+				return false; //if record already exists return false
+			}
+		}
+		//update i and hash funtion
+		s = (s + h2) % m;
+		i++;
+	}
+
+	if(table[s] == nullptr){//if find the first empty slot, insert r into the slot s.
+		r->slot = s;
+		table[s] = r;
+	}else{
+		return false;//table is full
+	}
+
+	intRec++;//increment intRec
+	return true;
+}
+
+
+//
+// Delete a Record r from the table.  Note that you'll have to
+// find the record first unless you keep some extra info in
+// the Record structure.
+//
+void StringTable::remove(Record *r)
+{
+	if(r->slot != -1){//if not nullptr
+		Record* newRecord = new Record("deleted");
+		newRecord->slot = -2;
+		table[r->slot] = newRecord;
+		intRec--;
+	}
+}
+
+//
+// Find a record with a key matching the input.  Return the
+// record if it exists, or nullptr if no matching record is found.
+//
+Record *StringTable::find(const char *key)
+{
+	int hash = toHashKey(key);
+	int h1 = baseHash(hash) ;
+	int h2 = stepHash(hash) ;
+	int s = h1;//Initial slot to try
+	int i = 0;
+
+	while(table[s] != nullptr && i < m){
+		if(toHashValue(s) == hash){
+			if(strncmp(table[s]->key, key,matchLength) == 0){
+				return table[s];
+			}
+		}
+		//update i and hash funtion
+		s = (s + h2) % m;
+		i++;
+	}
+
+	if(table[s] == nullptr || i >= m){
+		return nullptr;
+	}else{
+		return table[s];
+	}
+}
+
+void StringTable::printTable()
+ {
+	int filled = 0;// the number of filled slots
+	int empty = 0;// the number of empty slots
+ 	for (int j = 0; j < m; j++){
+ 		if (table[j]!=nullptr){
+ 			cout << "slot: "<< j << ", value: "<< table[j]->key << endl;
+ 			filled++;
+ 		}else{
+ 			cout <<"slot: "<< j <<":   empty"<< endl;
+ 			empty++;
+ 		}
+ 	}
+ 	cout << "total filled: "<< filled <<"   total empty: " << empty << endl;
+ }
+
+//////////////////////////////////////////////////////////
+
+// Convert a string key into an integer that serves as input to hash
+// functions.  This mapping is based on the idea of a linear-congruential
+// pesudorandom number generator, in which successive values r_i are 
+// generated by computing
+//    r_i = ( A * r_(i-1) + B ) mod M
+// A is a large prime number, while B is a small increment thrown in
+// so that we don't just compute successive powers of A mod M.
+//
+// We modify the above generator by perturbing each r_i, adding in
+// the ith character of the string and its offset, to alter the
+// pseudorandom sequence.
+//
+// NB: This fcn maps from space of arbitrary strings to ints, so
+//     collisions are very possible and NOT resolved, i.e. two
+//     distinct input strings may return the same value
+//
+int StringTable::toHashKey(const char *s) const
+{
+	if (s == nullptr){ //if Record value is empty
+	    return -1; //hash it to -1
+	 }
+	if (strncmp(s, "deleted",matchLength) == 0){//if Record value is deleted
+		return -2;//hash it to -2
+	}
+	int A = 1952786893;
+	int B = 367257;
+	int v = B;
+  
+	for (int j = 0; j < matchLength; j++)
+		v = A * (v + int(s[j]) + j) + B;
+  
+	if (v < 0) v = -v;
+	return v;
+
+}
+
+//find h1 base slot
+int StringTable::baseHash(int hashKey) const
+{
+	//multiplicative hashing function
+	int base =  (int) floor(m * ((KNUTHVAL* hashKey) - floor(KNUTHVAL* hashKey)));
+	return base;
+
+}
+
+//find h2 base slot
+int StringTable::stepHash(int hashKey) const
+{
+	//multiplicative hashing function
+	int step = (int) floor (m * ((PI* hashKey) -floor(PI* hashKey)));
+	if (step % 2 == 0){  //if step is even
+		step++; //add 1 to make it odd
+	}
+	return step;
+}
+
+
