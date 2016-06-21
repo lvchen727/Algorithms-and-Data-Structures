@@ -6,7 +6,9 @@ The codes are for my own future reference and for prospective employers to judge
 
 **Instuctor**: Dr. Steve Cole
 
-**Course website**: http://classes.engineering.wustl.edu/cse502/ Taken: Spring 2016
+**Course website**: http://classes.engineering.wustl.edu/cse502/ 
+
+**Taken**: Spring 2015
 
 **Language used**: C++
 
