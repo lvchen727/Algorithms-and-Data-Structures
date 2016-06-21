@@ -2,7 +2,7 @@
 
 The codes are for my own future reference and for prospective employers to judge my competence.
 
-**Name**: CSE 502N Fundamentals of Computer Science
+**Name**: CSE 502N Fundamentals of Computer Science@Wash U
 
 **Instuctor**: Dr. Steve Cole
 
